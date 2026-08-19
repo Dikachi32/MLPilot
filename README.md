@@ -3,6 +3,9 @@ MLPilot (ModelForge AI)
     A no-code, browser-based AutoML platform that trains, compares, and exports machine learning models from any CSV dataset in seconds.
 
 MLPilot is a lightweight web application built with Flask and scikit-learn that eliminates the need to write code for standard machine learning workflows. Upload a CSV file, and the system automatically handles data preprocessing, feature engineering, model selection, training, evaluation, and export — all through an intuitive web interface.
+
+----
+
 Table of Contents
 
     Features
@@ -19,6 +22,8 @@ Table of Contents
     Screenshots & UI
     Author
     License
+
+----
 
 Features
 Table
@@ -228,6 +233,7 @@ Condition	Detected Type
 Only 1 feature column and it's text (object)	NLP Classification
 Target has ≤10 unique values	Classification
 Target has >10 unique values	Regression
+
 Screenshots & UI
 The application features a modern, responsive single-page interface:
 
@@ -240,6 +246,16 @@ The application features a modern, responsive single-page interface:
     Info Panels — show auto-selections, cleaning log, SMOTE status, and NLP detection
     Loading Overlay — spinner with "Processing your dataset..." message during training
     Footer — credits, tech stack, and social links
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/2673de22-db32-4cb6-9c64-1eef9a800911" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/a3630720-072f-4f2a-842e-8ef58fa96cfa" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/d556b926-30c4-4691-9ab3-3595d7f04a58" />
+
+
+
+
+
+
+    
 
 Author
 Dikachi Baron
