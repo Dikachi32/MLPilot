@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}AutoML Builder — MLPilot{% endblock %}
+{% block content %}
+<div class="fade-up">
+  <h2>AutoML Builder</h2>
+  <p>Upload a CSV dataset and let MLPilot handle the rest.</p>
+</div>
+
+{% if not dataset_name %}
+<div class="card fade-up fade-up-1">
+  <form method="POST" enctype="multipart/form-data" action="{{ url_for('main.builder') }}">
+    <div class="card-header">
+      <div class="card-header-icon">📁</div>
+      <div><h3>Upload Dataset</h3><p>CSV or ZIP containing CSV</p></div>
+    </div>
+    <input type="file" name="dataset" accept=".csv,.zip" required>
+    <button type="submit" class="btn btn-primary btn-full" style="margin-top:1rem;">Upload & Analyze</button>
+  </form>
+</div>
+{% else %}
+<form method="POST" action="{{ url_for('main.train') }}">
+  <div class="dataset-bar fade-up">
+    <div class="ds-name"><div class="ds-icon">📊</div><span>{{ dataset_name }}</span></div>
+    <div class="ds-hint">{{ analysis.n_rows }} rows × {{ analysis.n_cols }} columns · Encoding: {{ encoding }}</div>
+  </div>
+
+  <div class="card fade-up fade-up-1">
+    <h3>Dataset Profile</h3>
+    <ul>
+      <li>Numeric: {{ analysis.numeric_columns|length }} · Categorical: {{ analysis.categorical_columns|length }} · Text: {{ analysis.text_columns|length }} · Date: {{ analysis.datetime_columns|length }}</li>
+      <li>Missing values detected in: {% for c,p in analysis.missing_values.items() if p>0 %}{{c}} ({{p}}%), {% endfor %}</li>
+      <li>Duplicate rows: {{ analysis.duplicate_rows }}</li>
+      <li>Constant columns: {{ analysis.constant_columns|join(', ') or 'None' }}</li>
+    </ul>
+  </div>
+
+  <div class="card fade-up fade-up-2">
+    <h3>Target Column</h3>
+    <p>Leave empty for unsupervised learning (clustering/PCA).</p>
+    <select name="target_column">
+      <option value="">— Unsupervised / No target —</option>
+      {% for col in columns %}
+      <option value="{{ col }}" {% if col in suggested_targets %}selected{% endif %}>{{ col }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="card fade-up fade-up-3">
+    <h3>Training Options</h3>
+    <label class="checkbox-item"><input type="checkbox" name="optimize" value="true"> Run hyperparameter optimization</label>
+    <p style="font-size:12px;color:var(--text-muted);margin-top:6px;">Optimization uses 1 optimization credit.</p>
+  </div>
+
+  <button type="submit" class="btn btn-primary btn-full fade-up fade-up-4">🚀 Train Models</button>
+</form>
+{% endif %}
+{% endblock %}

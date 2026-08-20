@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Results — MLPilot{% endblock %}
+{% block content %}
+<div class="fade-up">
+  <h2>Experiment Results</h2>
+  <p>{{ experiment.experiment_name }} · {{ experiment.detected_problem or 'Unknown' }}</p>
+</div>
+
+{% if result.recommendation %}
+<div class="info-panel panel-auto fade-up fade-up-1">
+  <h3>🏆 Recommended Model: {{ result.recommendation.model }}</h3>
+  <p><strong>Metric:</strong> {{ result.recommendation.metric }} = {{ result.recommendation.score }}</p>
+  {% if result.recommendation.baseline_score %}
+    <p><strong>Baseline:</strong> {{ result.recommendation.baseline_score }} → <strong>Optimized:</strong> {{ result.recommendation.optimized_score }} (+{{ result.recommendation.improvement_pct }}%)</p>
+  {% endif %}
+  <p><strong>Overfitting/Underfitting:</strong> {{ result.recommendation.overfitting_status or 'N/A' }}</p>
+  <p><strong>SMOTE applied:</strong> {{ 'Yes' if result.smote_applied else 'No' }}</p>
+  <p><strong>PCA applied:</strong> {{ 'Yes' if result.recommendation.pca_applied else 'No' }}</p>
+</div>
+{% endif %}
+
+{% if result.results %}
+<div class="card fade-up fade-up-2" style="padding:0;overflow:hidden;">
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Rank</th><th>Model</th><th>Score</th><th>Status</th><th>Download</th></tr>
+      </thead>
+      <tbody>
+        {% for r in result.results %}
+        <tr class="{% if loop.index==1 %}rank-1{% endif %}">
+          <td>{% if loop.index==1 %}🥇{% elif loop.index==2 %}🥈{% elif loop.index==3 %}🥉{% else %}{{ loop.index }}{% endif %}</td>
+          <td><span class="model-name">{{ r.model }}</span></td>
+          <td>{{ r.primary_score or '—' }}</td>
+          <td>{{ r.diagnostics.status if r.diagnostics else '—' }}</td>
+          <td>
+            {% if r.model in result.model_paths %}
+            <a href="{{ url_for('main.download_artifact', artifact_type='model', filename=result.model_paths[r.model]) }}">
+              <button class="btn-success btn-sm">⬇ .pkl</button>
+            </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div style="margin-top:2rem;text-align:center;">
+  <a href="{{ url_for('main.builder') }}"><button class="btn btn-secondary">← New Experiment</button></a>
+</div>
+{% endblock %}

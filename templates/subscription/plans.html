@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Plans — MLPilot{% endblock %}
+{% block content %}
+<div class="fade-up"><h2>Choose Your Plan</h2></div>
+<div class="mode-grid fade-up fade-up-1">
+  {% for key, plan in plans.items() %}
+  <div class="mode-option">
+    <div class="mode-label" style="height:100%;">
+      <div class="mode-title">{{ plan.name }}</div>
+      <div class="mode-desc">
+        <ul style="margin:8px 0 0 1rem;font-size:13px;">
+          <li>{{ plan.max_datasets }} datasets</li>
+          <li>{{ plan.max_training_runs }} training runs</li>
+          <li>{{ plan.max_optimization_runs }} optimizations</li>
+          <li>{{ plan.max_downloads }} downloads</li>
+          <li>{{ plan.max_dataset_size_mb }} MB max dataset</li>
+          <li>CNN: {{ 'Yes' if plan.allow_cnn else 'No' }}</li>
+          <li>Advanced optimization: {{ 'Yes' if plan.allow_advanced_optimization else 'No' }}</li>
+        </ul>
+      </div>
+      {% if key != 'free' %}
+      <form method="POST" action="{{ url_for('subscription.checkout') }}" style="margin-top:12px;">
+        <input type="hidden" name="plan" value="{{ key }}">
+        <input type="hidden" name="billing" value="monthly">
+        <button type="submit" class="btn btn-primary btn-sm">Select Plan</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

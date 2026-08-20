@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Register — MLPilot{% endblock %}
+{% block content %}
+<div class="card fade-up" style="max-width:480px;margin:3rem auto;">
+  <h2>Create Account</h2>
+  <p>Start your free 14-day trial. No payment required.</p>
+  <form method="POST">
+    <input type="text" name="full_name" placeholder="Full Name" style="width:100%;padding:10px;margin-bottom:10px;border:1px solid var(--border);border-radius:var(--radius-sm);">
+    <input type="text" name="username" placeholder="Username" required style="width:100%;padding:10px;margin-bottom:10px;border:1px solid var(--border);border-radius:var(--radius-sm);">
+    <input type="email" name="email" placeholder="Email" required style="width:100%;padding:10px;margin-bottom:10px;border:1px solid var(--border);border-radius:var(--radius-sm);">
+    <input type="password" name="password" placeholder="Password" required style="width:100%;padding:10px;margin-bottom:10px;border:1px solid var(--border);border-radius:var(--radius-sm);">
+    <button type="submit" class="btn btn-primary btn-full">Create Account & Start Trial</button>
+  </form>
+  <p style="text-align:center;margin-top:1rem;font-size:13px;">Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
+</div>
+{% endblock %}

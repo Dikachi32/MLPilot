@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Profile — MLPilot{% endblock %}
+{% block content %}
+<div class="card fade-up">
+  <h2>Profile</h2>
+  <p><strong>Name:</strong> {{ user.full_name or user.username }}</p>
+  <p><strong>Email:</strong> {{ user.email }}</p>
+  <p><strong>Plan:</strong> {{ user.plan }}</p>
+  <p><strong>Status:</strong> {{ user.subscription_status }}</p>
+  <hr>
+  <h3>Usage Quota</h3>
+  <ul>
+    <li>Datasets: {{ quota.datasets }}</li>
+    <li>Training runs: {{ quota.training_runs }}</li>
+    <li>Optimizations: {{ quota.optimization_runs }}</li>
+    <li>Downloads: {{ quota.downloads }}</li>
+  </ul>
+</div>
+{% endblock %}

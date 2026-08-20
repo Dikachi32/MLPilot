@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}History — MLPilot{% endblock %}
+{% block content %}
+<div class="fade-up"><h2>Experiment History</h2></div>
+<div class="card fade-up fade-up-1">
+  {% if experiments %}
+  <table>
+    <thead><tr><th>Date</th><th>Name</th><th>Problem</th><th>Best Model</th><th>Metric</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for e in experiments %}
+      <tr>
+        <td>{{ e.created_at.strftime('%Y-%m-%d %H:%M') if e.created_at else '—' }}</td>
+        <td><a href="{{ url_for('main.results', experiment_id=e.id) }}">{{ e.experiment_name }}</a></td>
+        <td>{{ e.detected_problem or '—' }}</td>
+        <td>{{ e.best_model_name or '—' }}</td>
+        <td>{{ e.best_metric_value or '—' }}</td>
+        <td>{{ e.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No experiments yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

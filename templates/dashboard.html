@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — MLPilot{% endblock %}
+{% block content %}
+<div class="fade-up">
+  <h2>Dashboard</h2>
+  <p>Welcome back, {{ user.username }}! Plan: <strong>{{ user.plan }}</strong></p>
+</div>
+
+<div class="stats-grid fade-up fade-up-1">
+  <div class="stat-card">
+    <div class="stat-label">Datasets Left</div>
+    <div class="stat-value">{{ quota.datasets }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Training Runs Left</div>
+    <div class="stat-value">{{ quota.training_runs }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Optimizations Left</div>
+    <div class="stat-value">{{ quota.optimization_runs }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Downloads Left</div>
+    <div class="stat-value">{{ quota.downloads }}</div>
+  </div>
+</div>
+
+<div class="card fade-up fade-up-2">
+  <h3>Recent Experiments</h3>
+  {% if experiments %}
+  <table>
+    <thead><tr><th>Name</th><th>Problem</th><th>Best Model</th><th>Score</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for e in experiments %}
+      <tr>
+        <td><a href="{{ url_for('main.results', experiment_id=e.id) }}">{{ e.experiment_name }}</a></td>
+        <td>{{ e.detected_problem or '—' }}</td>
+        <td>{{ e.best_model_name or '—' }}</td>
+        <td>{{ e.best_metric_value or '—' }}</td>
+        <td><span class="dtype-badge dtype-{{ e.status }}">{{ e.status }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No experiments yet. <a href="{{ url_for('main.builder') }}">Start your first AutoML run →</a></p>
+  {% endif %}
+</div>
+{% endblock %}

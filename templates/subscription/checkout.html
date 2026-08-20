@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Checkout — MLPilot{% endblock %}
+{% block content %}
+<div class="card fade-up" style="max-width:520px;margin:3rem auto;">
+  <h2>Checkout</h2>
+  <div class="alert alert-warning">
+    <span class="alert-icon">⚠️</span>
+    <div><strong>DEMO PAYMENT</strong> — No real transaction will occur.</div>
+  </div>
+  <p><strong>Plan:</strong> {{ plan }}</p>
+  <p><strong>Billing:</strong> {{ billing }}</p>
+  <p><strong>Amount:</strong> ${{ session.amount }} USD</p>
+  <form method="POST" action="{{ url_for('subscription.process') }}">
+    <input type="hidden" name="session_id" value="{{ session.session_id }}">
+    <input type="hidden" name="plan" value="{{ plan }}">
+    <input type="hidden" name="billing" value="{{ billing }}">
+    <button type="submit" class="btn btn-primary btn-full">Complete Demo Payment</button>
+  </form>
+</div>
+{% endblock %}

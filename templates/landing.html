@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="hero-section fade-up" style="text-align:center;padding:4rem 1rem;">
+  <h2>Train ML Models <span>Without Code</span></h2>
+  <p>Upload your data. MLPilot understands it, prepares it, selects algorithms, trains, evaluates, optimizes, and recommends the best model.</p>
+  <div class="hero-pills">
+    <span class="hero-pill">AutoML</span>
+    <span class="hero-pill">CNN</span>
+    <span class="hero-pill">NLP</span>
+    <span class="hero-pill">Unsupervised</span>
+    <span class="hero-pill">Hyperparameter Tuning</span>
+  </div>
+  <div style="margin-top:2rem;">
+    <a href="{{ url_for('auth.register') }}" class="btn btn-primary">Start Free Trial</a>
+    <a href="{{ url_for('auth.login') }}" class="btn btn-secondary" style="margin-left:12px;">Sign In</a>
+  </div>
+</div>
+{% endblock %}
