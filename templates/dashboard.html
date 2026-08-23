@@ -1,12 +1,80 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — MLPilot{% endblock %}
 {% block content %}
+
+<!-- Animated "How It Works" Pipeline Showcase -->
 <div class="fade-up">
-  <h2>Dashboard</h2>
-  <p>Welcome back, {{ user.username }}! Plan: <strong>{{ user.plan }}</strong></p>
+  <div class="hero-section" style="padding: 2rem 1rem 1.5rem;">
+    <h2>Welcome back, <span>{{ user.username }}</span>!</h2>
+    <p>Plan: <strong class="text-primary">{{ user.plan }}</strong> · Your intelligent AutoML cockpit</p>
+  </div>
 </div>
 
-<div class="stats-grid fade-up fade-up-1">
+<!-- How It Works — Animated Pipeline Flow -->
+<div class="card fade-up fade-up-1 how-it-works-card">
+  <h3 style="text-align:center; margin-bottom: 1.5rem; font-size: 1.1rem;">🚀 How MLPilot Works</h3>
+  <div class="pipeline-flow">
+    <div class="pipeline-step" data-step="1">
+      <div class="step-circle">
+        <div class="step-icon">📁</div>
+        <div class="step-ring"></div>
+      </div>
+      <div class="step-label">Upload CSV</div>
+      <div class="step-desc">Drop your dataset</div>
+    </div>
+    <div class="pipeline-arrow">
+      <div class="arrow-line"></div>
+      <div class="arrow-head">▶</div>
+    </div>
+    <div class="pipeline-step" data-step="2">
+      <div class="step-circle">
+        <div class="step-icon">🔍</div>
+        <div class="step-ring"></div>
+      </div>
+      <div class="step-label">Auto Profile</div>
+      <div class="step-desc">Detect & preprocess</div>
+    </div>
+    <div class="pipeline-arrow">
+      <div class="arrow-line"></div>
+      <div class="arrow-head">▶</div>
+    </div>
+    <div class="pipeline-step" data-step="3">
+      <div class="step-circle">
+        <div class="step-icon">🧠</div>
+        <div class="step-ring"></div>
+      </div>
+      <div class="step-label">Parallel Training</div>
+      <div class="step-desc">Multi-algorithm race</div>
+    </div>
+    <div class="pipeline-arrow">
+      <div class="arrow-line"></div>
+      <div class="arrow-head">▶</div>
+    </div>
+    <div class="pipeline-step" data-step="4">
+      <div class="step-circle">
+        <div class="step-icon">⚡</div>
+        <div class="step-ring"></div>
+      </div>
+      <div class="step-label">Optimize</div>
+      <div class="step-desc">Hyperparameter tuning</div>
+    </div>
+    <div class="pipeline-arrow">
+      <div class="arrow-line"></div>
+      <div class="arrow-head">▶</div>
+    </div>
+    <div class="pipeline-step" data-step="5">
+      <div class="step-circle">
+        <div class="step-icon">📦</div>
+        <div class="step-ring"></div>
+      </div>
+      <div class="step-label">Artifacts</div>
+      <div class="step-desc">Download & deploy</div>
+    </div>
+  </div>
+</div>
+
+<!-- Stats Grid -->
+<div class="stats-grid fade-up fade-up-2">
   <div class="stat-card">
     <div class="stat-label">Datasets Left</div>
     <div class="stat-value">{{ quota.datasets }}</div>
@@ -25,25 +93,53 @@
   </div>
 </div>
 
-<div class="card fade-up fade-up-2">
-  <h3>Recent Experiments</h3>
+<!-- Recent Experiments — Interactive Ledger -->
+<div class="card fade-up fade-up-3">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+    <h3>📋 Recent Experiments</h3>
+    <a href="{{ url_for('main.builder') }}" class="btn btn-primary btn-sm">+ New Experiment</a>
+  </div>
   {% if experiments %}
-  <table>
-    <thead><tr><th>Name</th><th>Problem</th><th>Best Model</th><th>Score</th><th>Status</th></tr></thead>
-    <tbody>
-      {% for e in experiments %}
-      <tr>
-        <td><a href="{{ url_for('main.results', experiment_id=e.id) }}">{{ e.experiment_name }}</a></td>
-        <td>{{ e.detected_problem or '—' }}</td>
-        <td>{{ e.best_model_name or '—' }}</td>
-        <td>{{ e.best_metric_value or '—' }}</td>
-        <td><span class="dtype-badge dtype-{{ e.status }}">{{ e.status }}</span></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="table-wrapper">
+    <table class="experiment-ledger">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Problem</th>
+          <th>Best Model</th>
+          <th>Score</th>
+          <th>Status</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in experiments %}
+        <tr class="experiment-row" data-href="{{ url_for('main.results', experiment_id=e.id) }}" data-experiment-id="{{ e.id }}">
+          <td>
+            <div class="exp-name">{{ e.experiment_name }}</div>
+            <div class="exp-meta">{{ e.dataset_name or '—' }}</div>
+          </td>
+          <td><span class="problem-chip-mini problem-{{ e.detected_problem or 'unknown' }}">{{ e.detected_problem or '—' }}</span></td>
+          <td><span class="model-tag">{{ e.best_model_name or '—' }}</span></td>
+          <td>
+            {% if e.best_metric_value %}
+              <span class="score-badge">{{ "%.2f"|format(e.best_metric_value) }}{% if e.best_metric_name and 'accuracy' in e.best_metric_name.lower() %}%{% endif %}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td><span class="status-badge status-{{ e.status }}">{{ e.status }}</span></td>
+          <td class="exp-date">{{ e.created_at.strftime('%b %d, %H:%M') if e.created_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% else %}
-  <p>No experiments yet. <a href="{{ url_for('main.builder') }}">Start your first AutoML run →</a></p>
+  <div class="empty-state">
+    <div class="empty-icon">🚀</div>
+    <p>No experiments yet.</p>
+    <a href="{{ url_for('main.builder') }}" class="btn btn-primary">Start your first AutoML run →</a>
+  </div>
   {% endif %}
 </div>
+
 {% endblock %}

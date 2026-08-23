@@ -1,57 +1,226 @@
 {% extends "base.html" %}
 {% block title %}AutoML Builder — MLPilot{% endblock %}
 {% block content %}
+
 <div class="fade-up">
-  <h2>AutoML Builder</h2>
-  <p>Upload a CSV dataset and let MLPilot handle the rest.</p>
+  <div class="hero-section" style="padding: 1.5rem 1rem 1rem;">
+    <h2>AutoML <span>Builder</span></h2>
+    <p>Upload a dataset and let MLPilot build, optimize, and package your ML pipeline.</p>
+    <div class="hero-pills">
+      <span class="hero-pill">Auto Preprocessing</span>
+      <span class="hero-pill">6+ Algorithms</span>
+      <span class="hero-pill">Ensemble Voting</span>
+      <span class="hero-pill">Hyperparameter Tuning</span>
+    </div>
+  </div>
 </div>
 
 {% if not dataset_name %}
-<div class="card fade-up fade-up-1">
+<!-- Upload State -->
+<div class="card fade-up fade-up-1 upload-card-animated">
   <form method="POST" enctype="multipart/form-data" action="{{ url_for('main.builder') }}">
     <div class="card-header">
       <div class="card-header-icon">📁</div>
-      <div><h3>Upload Dataset</h3><p>CSV or ZIP containing CSV</p></div>
+      <div><h3>Upload Dataset</h3><p>CSV or ZIP containing CSV files</p></div>
     </div>
-    <input type="file" name="dataset" accept=".csv,.zip" required>
-    <button type="submit" class="btn btn-primary btn-full" style="margin-top:1rem;">Upload & Analyze</button>
+    <div class="upload-zone">
+      <input type="file" name="dataset" accept=".csv,.zip" required id="dataset-input">
+      <div class="upload-hint">
+        <div class="upload-icon">☁️</div>
+        <p><strong>Click to browse</strong> or drag & drop</p>
+        <p class="upload-formats">Supports .csv, .zip (max 50MB)</p>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary btn-full" style="margin-top:1rem;">
+      <span>Upload & Analyze</span> →
+    </button>
   </form>
 </div>
 {% else %}
-<form method="POST" action="{{ url_for('main.train') }}">
+
+<!-- Replace Upload Form — MOVED OUTSIDE train form to fix nested forms -->
+<div class="collapsible-upload" id="replace-upload">
+  <div class="card" style="margin-bottom:1rem;">
+    <form method="POST" enctype="multipart/form-data" action="{{ url_for('main.builder') }}">
+      <div class="card-header">
+        <div class="card-header-icon">📁</div>
+        <div><h3>Replace Dataset</h3><p>Upload a different file</p></div>
+      </div>
+      <input type="file" name="dataset" accept=".csv,.zip" required>
+      <button type="submit" class="btn btn-secondary btn-sm" style="margin-top:0.75rem;">Upload New File</button>
+    </form>
+  </div>
+</div>
+
+<!-- Builder State — Train Form -->
+<form method="POST" action="{{ url_for('main.train') }}" id="train-form">
+  <input type="hidden" name="run_mode" id="run_mode_input" value="auto">
+
+  <!-- Dataset Bar -->
   <div class="dataset-bar fade-up">
     <div class="ds-name"><div class="ds-icon">📊</div><span>{{ dataset_name }}</span></div>
     <div class="ds-hint">{{ analysis.n_rows }} rows × {{ analysis.n_cols }} columns · Encoding: {{ encoding }}</div>
+    <button type="button" class="upload-replace" onclick="document.getElementById('replace-upload').classList.toggle('open')">↻ Replace</button>
   </div>
 
+  <!-- Dataset Profile -->
   <div class="card fade-up fade-up-1">
-    <h3>Dataset Profile</h3>
-    <ul>
-      <li>Numeric: {{ analysis.numeric_columns|length }} · Categorical: {{ analysis.categorical_columns|length }} · Text: {{ analysis.text_columns|length }} · Date: {{ analysis.datetime_columns|length }}</li>
-      <li>Missing values detected in: {% for c,p in analysis.missing_values.items() if p>0 %}{{c}} ({{p}}%), {% endfor %}</li>
-      <li>Duplicate rows: {{ analysis.duplicate_rows }}</li>
-      <li>Constant columns: {{ analysis.constant_columns|join(', ') or 'None' }}</li>
-    </ul>
+    <div class="card-header">
+      <div class="card-header-icon">📋</div>
+      <div><h3>Dataset Profile</h3><p>Automated structural analysis</p></div>
+    </div>
+    <div class="profile-chips">
+      <div class="profile-chip"><span class="chip-icon">🔢</span><strong>{{ analysis.numeric_columns|length }}</strong> Numeric</div>
+      <div class="profile-chip"><span class="chip-icon">🏷️</span><strong>{{ analysis.categorical_columns|length }}</strong> Categorical</div>
+      <div class="profile-chip"><span class="chip-icon">📝</span><strong>{{ analysis.text_columns|length }}</strong> Text</div>
+      <div class="profile-chip"><span class="chip-icon">📅</span><strong>{{ analysis.datetime_columns|length }}</strong> Date</div>
+      <div class="profile-chip"><span class="chip-icon">❓</span><strong>{{ analysis.missing_values.values() | select('>', 0) | list | length }}</strong> With Missing</div>
+      <div class="profile-chip"><span class="chip-icon">🔄</span><strong>{{ analysis.duplicate_rows }}</strong> Duplicates</div>
+      <div class="profile-chip"><span class="chip-icon">📌</span><strong>{{ analysis.constant_columns|length }}</strong> Constants</div>
+    </div>
   </div>
 
+  <!-- Mode Toggle: Auto vs Manual -->
   <div class="card fade-up fade-up-2">
-    <h3>Target Column</h3>
-    <p>Leave empty for unsupervised learning (clustering/PCA).</p>
-    <select name="target_column">
+    <div class="card-header">
+      <div class="card-header-icon">⚙️</div>
+      <div><h3>Pipeline Mode</h3><p>Choose how much control you want</p></div>
+    </div>
+    <div class="mode-grid">
+      <div class="mode-option">
+        <input type="radio" name="run_mode_radio" id="mode_auto" value="auto" checked onchange="toggleMode('auto')">
+        <label for="mode_auto" class="mode-label">
+          <div class="mode-title"><span class="mode-icon">⚡</span> Auto Mode</div>
+          <div class="mode-desc">System handles everything: target detection, feature selection, model picking, and optimization. Best for quick results.</div>
+        </label>
+      </div>
+      <div class="mode-option">
+        <input type="radio" name="run_mode_radio" id="mode_manual" value="manual" onchange="toggleMode('manual')">
+        <label for="mode_manual" class="mode-label">
+          <div class="mode-title"><span class="mode-icon">🎛</span> Manual Mode</div>
+          <div class="mode-desc">You pick the target column, select features, and choose which algorithms to run. Full control over the pipeline.</div>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Target Column -->
+  <div class="card fade-up fade-up-3">
+    <div class="card-header">
+      <div class="card-header-icon">🎯</div>
+      <div><h3>Target Column</h3><p>The variable you want to predict</p></div>
+    </div>
+    <select name="target_column" id="target_column" onchange="onTargetChange()">
       <option value="">— Unsupervised / No target —</option>
       {% for col in columns %}
       <option value="{{ col }}" {% if col in suggested_targets %}selected{% endif %}>{{ col }}</option>
       {% endfor %}
     </select>
+    <p class="section-hint" id="target-hint">Leave empty for unsupervised learning (clustering / PCA).</p>
   </div>
 
-  <div class="card fade-up fade-up-3">
-    <h3>Training Options</h3>
-    <label class="checkbox-item"><input type="checkbox" name="optimize" value="true"> Run hyperparameter optimization</label>
-    <p style="font-size:12px;color:var(--text-muted);margin-top:6px;">Optimization uses 1 optimization credit.</p>
+  <!-- Manual Mode: Feature Selection -->
+  <div class="card fade-up fade-up-3 manual-section" id="feature-selection" style="display:none;">
+    <div class="card-header">
+      <div class="card-header-icon">🔧</div>
+      <div>
+        <h3>Feature Selection</h3>
+        <p>Choose which columns to include in training</p>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:0.75rem;">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="selectAllFeatures(true)">Select All</button>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="selectAllFeatures(false)">Deselect All</button>
+    </div>
+    <div class="table-wrapper">
+      <table class="feature-table">
+        <thead>
+          <tr>
+            <th style="width:40px;"><input type="checkbox" id="select-all-features" onchange="selectAllFeatures(this.checked)"></th>
+            <th>Column</th>
+            <th>Type</th>
+            <th>Unique</th>
+            <th>Sample Data</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for col in columns %}
+          <tr>
+            <td><input type="checkbox" name="features" value="{{ col }}" class="feature-checkbox" checked></td>
+            <td><strong>{{ col }}</strong></td>
+            <td><span class="dtype-badge dtype-{{ column_types.get(col, 'other') }}">{{ column_types.get(col, 'other') }}</span></td>
+            <td><span class="unique-count">{{ column_uniques.get(col, 0) }}</span></td>
+            <td><span class="sample-data" title="{{ column_samples.get(col, '') }}">{{ column_samples.get(col, '—') }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <button type="submit" class="btn btn-primary btn-full fade-up fade-up-4">🚀 Train Models</button>
+  <!-- Manual Mode: Model Selection -->
+  <div class="card fade-up fade-up-3 manual-section" id="model-selection" style="display:none;">
+    <div class="card-header">
+      <div class="card-header-icon">🧠</div>
+      <div>
+        <h3>Algorithm Selection</h3>
+        <p>Pick the models to train (detected problem type determines available options)</p>
+      </div>
+    </div>
+    <div id="classification-models" style="display:none;">
+      <p class="section-hint">Classification Models</p>
+      <div class="checkbox-group">
+        {% for model in classification_models %}
+        <label class="checkbox-item">
+          <input type="checkbox" name="models" value="{{ model }}" checked>
+          <span>{{ model }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div id="regression-models" style="display:none;">
+      <p class="section-hint">Regression Models</p>
+      <div class="checkbox-group">
+        {% for model in regression_models %}
+        <label class="checkbox-item">
+          <input type="checkbox" name="models" value="{{ model }}" checked>
+          <span>{{ model }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <p class="section-hint" id="model-hint" style="color:var(--text-muted);">Select a target column above to see available algorithms.</p>
+  </div>
+
+  <!-- Training Options -->
+  <div class="card fade-up fade-up-4">
+    <div class="card-header">
+      <div class="card-header-icon">🔬</div>
+      <div><h3>Training Options</h3><p>Advanced configuration</p></div>
+    </div>
+    <label class="checkbox-item" style="max-width:100%;">
+      <input type="checkbox" name="optimize" value="true" id="optimize-check">
+      <span>Run hyperparameter optimization (RandomizedSearchCV)</span>
+    </label>
+    <p class="section-hint">Optimization uses 1 optimization credit. Significantly improves model performance.</p>
+  </div>
+
+  <!-- Training Progress Log Panel -->
+  <div class="card fade-up fade-up-4" id="training-logs" style="display:none;">
+    <div class="card-header">
+      <div class="card-header-icon">📡</div>
+      <div><h3>Training Progress</h3><p>Live pipeline execution log</p></div>
+    </div>
+    <div class="log-terminal" id="log-terminal">
+      <div class="log-line log-info">⏳ Initializing pipeline...</div>
+    </div>
+  </div>
+
+  <!-- Train Button — Pure submit, no JS interference -->
+  <button type="submit" class="btn btn-primary btn-full fade-up fade-up-4" id="train-btn">
+    🚀 Train Models
+  </button>
 </form>
 {% endif %}
+
 {% endblock %}

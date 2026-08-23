@@ -1,4 +1,4 @@
-"""Experiment history persistence."""
+"""Experiment history persistence with full JSON state support."""
 from models.experiment import Experiment, db
 from typing import List, Optional
 
@@ -37,4 +37,30 @@ class HistoryService:
         if error:
             exp.error_message = error
         exp.completed_at = datetime.utcnow()
+        db.session.commit()
+
+    # ── JSON field setters for full state persistence ──
+    @staticmethod
+    def set_preprocessing_log(exp: Experiment, log_json: str):
+        exp.preprocessing_log = log_json
+        db.session.commit()
+
+    @staticmethod
+    def set_models_tested(exp: Experiment, models_json: str):
+        exp.models_tested = models_json
+        db.session.commit()
+
+    @staticmethod
+    def set_artifact_paths(exp: Experiment, paths_json: str):
+        exp.artifact_paths = paths_json
+        db.session.commit()
+
+    @staticmethod
+    def set_features_used(exp: Experiment, features_json: str):
+        exp.features_used = features_json
+        db.session.commit()
+
+    @staticmethod
+    def set_result_json(exp: Experiment, result_json: str):
+        exp.result_json = result_json
         db.session.commit()

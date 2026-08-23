@@ -1,26 +1,65 @@
 {% extends "base.html" %}
 {% block title %}History — MLPilot{% endblock %}
 {% block content %}
-<div class="fade-up"><h2>Experiment History</h2></div>
+
+<div class="fade-up">
+  <div class="hero-section" style="padding: 1.5rem 1rem 1rem;">
+    <h2>Experiment <span>History</span></h2>
+    <p>Your complete archive of AutoML runs. Click any experiment to reconstruct its full evaluation dashboard.</p>
+  </div>
+</div>
+
 <div class="card fade-up fade-up-1">
   {% if experiments %}
-  <table>
-    <thead><tr><th>Date</th><th>Name</th><th>Problem</th><th>Best Model</th><th>Metric</th><th>Status</th></tr></thead>
-    <tbody>
-      {% for e in experiments %}
-      <tr>
-        <td>{{ e.created_at.strftime('%Y-%m-%d %H:%M') if e.created_at else '—' }}</td>
-        <td><a href="{{ url_for('main.results', experiment_id=e.id) }}">{{ e.experiment_name }}</a></td>
-        <td>{{ e.detected_problem or '—' }}</td>
-        <td>{{ e.best_model_name or '—' }}</td>
-        <td>{{ e.best_metric_value or '—' }}</td>
-        <td>{{ e.status }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="table-wrapper">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Name</th>
+          <th>Problem</th>
+          <th>Best Model</th>
+          <th>Metric</th>
+          <th>Mode</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in experiments %}
+        <tr class="history-row" data-href="{{ url_for('main.results', experiment_id=e.id) }}">
+          <td class="history-date">{{ e.created_at.strftime('%Y-%m-%d %H:%M') if e.created_at else '—' }}</td>
+          <td>
+            <div class="history-name">{{ e.experiment_name }}</div>
+            <div class="history-dataset">{{ e.dataset_name or '—' }}</div>
+          </td>
+          <td><span class="problem-chip-mini problem-{{ e.detected_problem or 'unknown' }}">{{ e.detected_problem or '—' }}</span></td>
+          <td><span class="model-tag">{{ e.best_model_name or '—' }}</span></td>
+          <td>
+            {% if e.best_metric_value %}
+              <span class="score-badge">
+                {% if e.best_metric_name and 'accuracy' in e.best_metric_name.lower() %}
+                  {{ "%.2f"|format(e.best_metric_value) }}%
+                {% else %}
+                  {{ "%.4f"|format(e.best_metric_value) }}
+                {% endif %}
+              </span>
+              <div class="metric-name">{{ e.best_metric_name or '' }}</div>
+            {% else %}—{% endif %}
+          </td>
+          <td><span class="mode-badge mode-{{ e.run_mode or 'auto' }}">{{ (e.run_mode or 'auto')|title }}</span></td>
+          <td><span class="status-badge status-{{ e.status }}">{{ e.status|title }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% else %}
-  <p>No experiments yet.</p>
+  <div class="empty-state">
+    <div class="empty-icon">📭</div>
+    <p>No experiments in your history yet.</p>
+    <a href="{{ url_for('main.builder') }}" class="btn btn-primary">Start your first experiment →</a>
+  </div>
   {% endif %}
 </div>
+
 {% endblock %}

@@ -1,44 +1,213 @@
 {% extends "base.html" %}
 {% block title %}Results — MLPilot{% endblock %}
 {% block content %}
-<div class="fade-up">
-  <h2>Experiment Results</h2>
-  <p>{{ experiment.experiment_name }} · {{ experiment.detected_problem or 'Unknown' }}</p>
+
+{% set result = result or {} %}
+{% set recommendation = result.get('recommendation', {}) or {} %}
+{% set preprocessing = result.get('preprocessing', {}) or {} %}
+{% set metadata = result.get('metadata', {}) or {} %}
+{% set problem_type = result.get('problem_type', 'unknown') %}
+{% set results_list = result.get('results', []) or [] %}
+{% set model_paths = result.get('model_paths', {}) or {} %}
+{% set preproc_paths = result.get('preproc_paths', {}) or {} %}
+{% set smote_applied = result.get('smote_applied', False) %}
+
+<!-- Header -->
+<div class="fade-up results-header">
+  <div>
+    <h2>{{ experiment.experiment_name }}</h2>
+    <p style="color:var(--text-muted); font-size:13px; margin-top:4px;">
+      {{ experiment.created_at.strftime('%B %d, %Y at %H:%M') if experiment.created_at else '' }}
+      {% if experiment.run_mode %}· Mode: <strong>{{ experiment.run_mode|title }}</strong>{% endif %}
+    </p>
+  </div>
+  <span class="problem-chip problem-{{ problem_type }}">
+    {{ problem_type|title }}
+  </span>
 </div>
 
-{% if result.recommendation %}
+<!-- Stats Row -->
+<div class="stats-grid fade-up fade-up-1">
+  <div class="stat-card">
+    <div class="stat-label">Models Trained</div>
+    <div class="stat-value">{{ results_list|length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Best Score</div>
+    <div class="stat-value" style="color:var(--success-dark);">
+      {% if recommendation.get('score') %}
+        {{ "%.2f"|format(recommendation.get('score', 0)) }}{% if recommendation.get('metric') and 'accuracy' in recommendation.get('metric', '').lower() %}%{% endif %}
+      {% else %}—{% endif %}
+    </div>
+    <div class="stat-sub">{{ recommendation.get('metric', '') }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Features Used</div>
+    <div class="stat-value">{{ preprocessing.get('feature_names', [])|length if preprocessing else '—' }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Dataset Shape</div>
+    <div class="stat-value" style="font-size:1.1rem;">{{ metadata.get('dataset_shape', ['—','—'])[0] }}×{{ metadata.get('dataset_shape', ['—','—'])[1] }}</div>
+  </div>
+</div>
+
+<!-- Info Panels -->
+{% if recommendation.get('preprocessing_applied') %}
 <div class="info-panel panel-auto fade-up fade-up-1">
-  <h3>🏆 Recommended Model: {{ result.recommendation.model }}</h3>
-  <p><strong>Metric:</strong> {{ result.recommendation.metric }} = {{ result.recommendation.score }}</p>
-  {% if result.recommendation.baseline_score %}
-    <p><strong>Baseline:</strong> {{ result.recommendation.baseline_score }} → <strong>Optimized:</strong> {{ result.recommendation.optimized_score }} (+{{ result.recommendation.improvement_pct }}%)</p>
-  {% endif %}
-  <p><strong>Overfitting/Underfitting:</strong> {{ result.recommendation.overfitting_status or 'N/A' }}</p>
-  <p><strong>SMOTE applied:</strong> {{ 'Yes' if result.smote_applied else 'No' }}</p>
-  <p><strong>PCA applied:</strong> {{ 'Yes' if result.recommendation.pca_applied else 'No' }}</p>
+  <h3>🤖 Auto Mode — System Selections</h3>
+  <ul>
+    <li><strong>Target Column:</strong> {{ experiment.target_column or 'Auto-detected' }}</li>
+    <li><strong>Problem Type:</strong> {{ problem_type }}</li>
+    <li><strong>SMOTE Applied:</strong> {{ 'Yes' if smote_applied else 'No' }}</li>
+    <li><strong>PCA Applied:</strong> {{ 'Yes' if recommendation.get('pca_applied') else 'No' }}</li>
+  </ul>
 </div>
 {% endif %}
 
-{% if result.results %}
-<div class="card fade-up fade-up-2" style="padding:0;overflow:hidden;">
+{% if preprocessing.get('cleaning_log') %}
+<div class="info-panel panel-cleaning fade-up fade-up-1">
+  <h3>🧹 Data Cleaning & Preparation</h3>
+  <ol>
+    {% for log in preprocessing.get('cleaning_log', []) %}
+    <li>{{ log }}</li>
+    {% endfor %}
+  </ol>
+</div>
+{% endif %}
+
+{% if smote_applied %}
+<div class="info-panel panel-smote fade-up fade-up-1">
+  <h3>⚖️ SMOTE Applied</h3>
+  <p>Class imbalance was detected and corrected using Synthetic Minority Over-sampling Technique (SMOTE) on the training data only.</p>
+</div>
+{% endif %}
+
+{% if problem_type == 'nlp' %}
+<div class="info-panel panel-nlp fade-up fade-up-1">
+  <h3>📝 NLP Dataset Detected</h3>
+  <p>Text data was processed using TF-IDF vectorization. The best performing text classification model has been selected.</p>
+</div>
+{% endif %}
+
+{% if preprocessing.get('dropped_columns') %}
+<div class="info-panel panel-warning fade-up fade-up-1">
+  <h3>🚫 Columns Automatically Skipped</h3>
+  <ul>
+    {% for dc in preprocessing.get('dropped_columns', []) %}
+    <li><strong>{{ dc.column }}</strong> — {{ dc.reason }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<!-- Recommendation Panel -->
+{% if recommendation.get('model') %}
+<div class="info-panel panel-auto fade-up fade-up-2" style="border-left-color:var(--success); background:var(--success-light);">
+  <h3>🏆 Recommended Model: {{ recommendation.get('model', '—') }}</h3>
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:1rem; margin-top:0.75rem;">
+    <div>
+      <div class="stat-label">Primary Metric</div>
+      <div class="stat-value" style="font-size:1.4rem;">{{ recommendation.get('metric', '—') }} = {{ "%.2f"|format(recommendation.get('score', 0)) }}{% if recommendation.get('metric') and 'accuracy' in recommendation.get('metric', '').lower() %}%{% endif %}</div>
+    </div>
+    {% if recommendation.get('baseline_score') %}
+    <div>
+      <div class="stat-label">Baseline → Optimized</div>
+      <div class="stat-value" style="font-size:1.2rem;">{{ "%.2f"|format(recommendation.get('baseline_score', 0)) }} → {{ "%.2f"|format(recommendation.get('optimized_score', 0)) }}</div>
+      <div class="stat-sub" style="color:var(--success-dark);">+{{ "%.1f"|format(recommendation.get('improvement_pct', 0)) }}% improvement</div>
+    </div>
+    {% endif %}
+    <div>
+      <div class="stat-label">Generalization</div>
+      <div class="stat-value" style="font-size:1.1rem;">{{ recommendation.get('overfitting_status', 'N/A') }}</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Professional Results Leaderboard -->
+{% if results_list %}
+<div class="card fade-up fade-up-3" style="padding:0; overflow:hidden;">
+  <div style="padding:1.25rem 1.5rem; border-bottom:1px solid var(--border);">
+    <h3>📊 Model Leaderboard</h3>
+  </div>
   <div class="table-wrapper">
-    <table>
+    <table class="leaderboard-table">
       <thead>
-        <tr><th>Rank</th><th>Model</th><th>Score</th><th>Status</th><th>Download</th></tr>
+        <tr>
+          <th style="width:50px;">Rank</th>
+          <th>Model</th>
+          <th>Problem</th>
+          {% if problem_type == 'classification' %}
+          <th>Accuracy</th>
+          <th>Precision</th>
+          <th>Recall</th>
+          <th>F1</th>
+          {% else %}
+          <th>MSE</th>
+          <th>MAE</th>
+          <th>RMSE</th>
+          <th>R²</th>
+          {% endif %}
+          <th>Performance</th>
+          <th>Status</th>
+          <th>Download</th>
+        </tr>
       </thead>
       <tbody>
-        {% for r in result.results %}
-        <tr class="{% if loop.index==1 %}rank-1{% endif %}">
-          <td>{% if loop.index==1 %}🥇{% elif loop.index==2 %}🥈{% elif loop.index==3 %}🥉{% else %}{{ loop.index }}{% endif %}</td>
-          <td><span class="model-name">{{ r.model }}</span></td>
-          <td>{{ r.primary_score or '—' }}</td>
-          <td>{{ r.diagnostics.status if r.diagnostics else '—' }}</td>
+        {% set best_score = results_list[0].get('primary_score', 0) if results_list else 0 %}
+        {% for r in results_list %}
+        {% set r_model = r.get('model', '') %}
+        {% set r_problem = r.get('problem_type', problem_type) %}
+        {% set r_score = r.get('primary_score', 0) %}
+        {% set r_test_metrics = r.get('test_metrics', {}) or {} %}
+        {% set r_diagnostics = r.get('diagnostics', {}) or {} %}
+        {% set r_optimized = r.get('optimized', False) %}
+        <tr class="{% if loop.index==1 %}rank-1{% endif %} {% if 'Ensemble' in r_model %}ensemble-row{% endif %}">
           <td>
-            {% if r.model in result.model_paths %}
-            <a href="{{ url_for('main.download_artifact', artifact_type='model', filename=result.model_paths[r.model]) }}">
+            {% if loop.index==1 %}<span class="rank-badge rank-1-badge">🥇</span>
+            {% elif loop.index==2 %}<span class="rank-badge rank-2-badge">🥈</span>
+            {% elif loop.index==3 %}<span class="rank-badge rank-3-badge">🥉</span>
+            {% else %}<span class="rank-badge rank-other-badge">{{ loop.index }}</span>{% endif %}
+          </td>
+          <td>
+            <span class="model-name">{{ r_model }}</span>
+            {% if r_optimized %}<span class="optimized-badge">OPTIMIZED</span>{% endif %}
+          </td>
+          <td><span class="dtype-badge dtype-{{ r_problem }}">{{ r_problem }}</span></td>
+          {% if problem_type == 'classification' %}
+          <td class="metric-cell">{{ "%.2f"|format(r_test_metrics.get('accuracy', 0)) if r_test_metrics.get('accuracy') else '—' }}%</td>
+          <td class="metric-cell">{{ "%.2f"|format(r_test_metrics.get('precision', 0)) if r_test_metrics.get('precision') else '—' }}%</td>
+          <td class="metric-cell">{{ "%.2f"|format(r_test_metrics.get('recall', 0)) if r_test_metrics.get('recall') else '—' }}%</td>
+          <td class="metric-cell">{{ "%.2f"|format(r_test_metrics.get('f1', 0)) if r_test_metrics.get('f1') else '—' }}%</td>
+          {% else %}
+          <td class="metric-cell">{{ "%.4f"|format(r_test_metrics.get('mse', 0)) if r_test_metrics.get('mse') else '—' }}</td>
+          <td class="metric-cell">{{ "%.4f"|format(r_test_metrics.get('mae', 0)) if r_test_metrics.get('mae') else '—' }}</td>
+          <td class="metric-cell">{{ "%.4f"|format(r_test_metrics.get('rmse', 0)) if r_test_metrics.get('rmse') else '—' }}</td>
+          <td class="metric-cell">{{ "%.4f"|format(r_test_metrics.get('r2', 0)) if r_test_metrics.get('r2') else '—' }}</td>
+          {% endif %}
+          <td class="perf-bar-cell">
+            <div class="perf-bar-wrap">
+              <div class="perf-bar-bg">
+                {% if problem_type == 'classification' %}
+                <div class="perf-bar-fill" data-width="{{ r_score }}"></div>
+                {% else %}
+                <div class="perf-bar-fill" data-width="{{ (1 - (r_score / best_score)) * 100 if best_score > 0 else 0 }}"></div>
+                {% endif %}
+              </div>
+              <span class="perf-bar-label">{{ "%.1f"|format(r_score) }}{% if problem_type == 'classification' %}%{% endif %}</span>
+            </div>
+          </td>
+          <td>
+            {% if r_diagnostics %}
+            <span class="status-pill status-{{ r_diagnostics.get('status', 'unknown') }}">{{ r_diagnostics.get('status', 'unknown')|replace('_', ' ')|title }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if r_model in model_paths %}
+            <a href="{{ url_for('main.download_artifact', artifact_type='model', filename=model_paths[r_model]|replace('\\', '/')|replace(current_app.config['ARTIFACT_FOLDER'] + '/', '') ) }}">
               <button class="btn-success btn-sm">⬇ .pkl</button>
             </a>
-            {% endif %}
+            {% else %}—{% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -48,7 +217,86 @@
 </div>
 {% endif %}
 
-<div style="margin-top:2rem;text-align:center;">
-  <a href="{{ url_for('main.builder') }}"><button class="btn btn-secondary">← New Experiment</button></a>
+<!-- Artifact Downloads Section -->
+<div class="card fade-up fade-up-4">
+  <div class="card-header">
+    <div class="card-header-icon">📦</div>
+    <div><h3>Artifact Downloads</h3><p>Export every component of your trained pipeline</p></div>
+  </div>
+  <div class="artifact-grid">
+    {% if preproc_paths %}
+      {% if preproc_paths.get('scaler') %}
+      <div class="artifact-card">
+        <div class="artifact-icon">⚖️</div>
+        <div class="artifact-name">Feature Scaler</div>
+        <div class="artifact-desc">StandardScaler fitted on training data</div>
+        <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=preproc_paths.get('scaler', '')|replace('\\', '/')|replace(current_app.config['ARTIFACT_FOLDER'] + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
+      </div>
+      {% endif %}
+      {% if preproc_paths.get('pca') %}
+      <div class="artifact-card">
+        <div class="artifact-icon">📉</div>
+        <div class="artifact-name">PCA Transformer</div>
+        <div class="artifact-desc">Dimensionality reduction matrix</div>
+        <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=preproc_paths.get('pca', '')|replace('\\', '/')|replace(current_app.config['ARTIFACT_FOLDER'] + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
+      </div>
+      {% endif %}
+      {% if preproc_paths.get('vectorizer') %}
+      <div class="artifact-card">
+        <div class="artifact-icon">📝</div>
+        <div class="artifact-name">TF-IDF Vectorizer</div>
+        <div class="artifact-desc">NLP text preprocessing pipeline</div>
+        <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=preproc_paths.get('vectorizer', '')|replace('\\', '/')|replace(current_app.config['ARTIFACT_FOLDER'] + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
+      </div>
+      {% endif %}
+      {% if preproc_paths.get('target_encoder') %}
+      <div class="artifact-card">
+        <div class="artifact-icon">🎯</div>
+        <div class="artifact-name">Target Encoder</div>
+        <div class="artifact-desc">Label encoder for target column</div>
+        <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=preproc_paths.get('target_encoder', '')|replace('\\', '/')|replace(current_app.config['ARTIFACT_FOLDER'] + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
+      </div>
+      {% endif %}
+      {% for key, path in preproc_paths.items() %}
+        {% if key.startswith('le_') %}
+        <div class="artifact-card">
+          <div class="artifact-icon">🔤</div>
+          <div class="artifact-name">Label Encoder: {{ key[3:] }}</div>
+          <div class="artifact-desc">Categorical column encoder</div>
+          <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=path|replace('\\', '/')|replace(current_app.config['ARTIFACT_FOLDER'] + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
+        </div>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <!-- Production Bundle CTA -->
+  <div class="bundle-cta fade-up fade-up-4">
+    <div class="bundle-icon">🚀</div>
+    <div class="bundle-info">
+      <h4>Unified Production Package</h4>
+      <p>One .zip containing all models, preprocessing transformers, feature names, and configuration metadata — ready for deployment.</p>
+    </div>
+    <a href="{{ url_for('main.download_bundle', experiment_id=experiment.id) }}" class="btn btn-primary">
+      📦 Download Bundle
+    </a>
+  </div>
 </div>
+
+<!-- What Next Section -->
+<div class="next-steps fade-up fade-up-4">
+  <h3>💡 What Next?</h3>
+  <ul>
+    <li><strong>Best Model:</strong> {{ recommendation.get('model', '—') }} achieved the highest performance. Use its .pkl file for inference.</li>
+    <li><strong>Ensemble Advantage:</strong> The Voting Ensemble combines multiple models for more robust predictions when individual models disagree.</li>
+    <li><strong>Download Everything:</strong> Grab the <strong>Production Package</strong> for a complete, deployment-ready bundle with all artifacts and metadata.</li>
+    <li><strong>Iterate:</strong> Run a new experiment with different features or try hyperparameter optimization for even better results.</li>
+  </ul>
+</div>
+
+<div style="margin-top:2rem; text-align:center;">
+  <a href="{{ url_for('main.builder') }}"><button class="btn btn-secondary">← New Experiment</button></a>
+  <a href="{{ url_for('main.history') }}" style="margin-left:0.5rem;"><button class="btn btn-secondary">📜 View History</button></a>
+</div>
+
 {% endblock %}
