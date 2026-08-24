@@ -197,9 +197,17 @@ def train():
         dataset_name=dataset_name
     )
 
-    # Run pipeline
-    pipeline = MLPilotPipeline(artifact_folder=current_app.config["ARTIFACT_FOLDER"])
-    result = pipeline.run(df, target_col=target_col, user_plan=current_user.plan, optimize=optimize)
+    # Run pipeline with bulletproof error handling
+    try:
+        pipeline = MLPilotPipeline(artifact_folder=current_app.config.get("ARTIFACT_FOLDER", "artifacts"))
+        result = pipeline.run(df, target_col=target_col, user_plan=current_user.plan, optimize=optimize)
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        current_app.logger.error(f"Pipeline error: {str(e)}\n{error_detail}")
+        HistoryService.finalize_experiment(exp, status="failed", error=f"{str(e)} — {error_detail[:500]}")
+        flash(f"Training failed: {str(e)}. This dataset may have incompatible features. Try a different dataset or check data quality.", "error")
+        return redirect(url_for("main.builder"))
 
     if result["status"] == "failed":
         HistoryService.finalize_experiment(exp, status="failed", error=result.get("error"))
@@ -315,7 +323,8 @@ def results(experiment_id):
     if not result or session_exp_id != experiment_id:
         result = reconstruct_result_from_experiment(exp)
 
-    return render_template("results.html", experiment=exp, result=result)
+    artifact_folder = current_app.config.get("ARTIFACT_FOLDER", "artifacts")
+    return render_template("results.html", experiment=exp, result=result, artifact_folder=artifact_folder)
 
 
 def reconstruct_result_from_experiment(exp):
@@ -339,8 +348,8 @@ def reconstruct_result_from_experiment(exp):
         "model_paths": {},
         "preproc_paths": {},
         "metadata": {
-            "dataset_shape": exp.dataset_shape,
-            "target_column": exp.target_column,
+            "dataset_shape": getattr(exp, "dataset_shape", None),
+            "target_column": getattr(exp, "target_column", None),
         },
     }
 
@@ -393,20 +402,41 @@ def download_artifact(artifact_type, filename):
         flash(msg, "error")
         return redirect(url_for("main.dashboard"))
 
-    safe_filename = secure_filename(filename)
-    # Check if it's a bundle download (contains experiment_id in path)
-    if artifact_type == "bundle":
-        # filename format: experiment_id/mlpilot_package_xxx.zip
-        parts = safe_filename.split("/")
-        if len(parts) == 2:
-            path = os.path.join(current_app.config["ARTIFACT_FOLDER"], parts[0], parts[1])
-        else:
-            path = os.path.join(current_app.config["ARTIFACT_FOLDER"], safe_filename)
-    else:
-        path = os.path.join(current_app.config["ARTIFACT_FOLDER"], safe_filename)
+    # The filename from template may be a relative path like "exp_id/model.pkl"
+    # or an absolute path. We need to resolve it correctly.
+    artifact_folder = current_app.config.get("ARTIFACT_FOLDER", "artifacts")
 
-    if not os.path.exists(path):
-        flash("File not found.", "error")
+    # Try multiple path resolution strategies
+    possible_paths = []
+
+    # Strategy 1: filename is already relative to project root (contains artifact_folder)
+    if filename.startswith(artifact_folder):
+        possible_paths.append(filename)
+
+    # Strategy 2: join artifact_folder with filename
+    possible_paths.append(os.path.join(artifact_folder, filename))
+
+    # Strategy 3: filename might have backslashes on Windows
+    possible_paths.append(os.path.join(artifact_folder, filename.replace("/", os.sep)))
+
+    # Strategy 4: try with secure_filename
+    safe = secure_filename(filename)
+    possible_paths.append(os.path.join(artifact_folder, safe))
+
+    # Strategy 5: the path might already be absolute
+    if os.path.isabs(filename):
+        possible_paths.append(filename)
+
+    # Find the first existing path
+    path = None
+    for p in possible_paths:
+        if os.path.exists(p):
+            path = p
+            break
+
+    if not path:
+        current_app.logger.error(f"Artifact not found. Tried: {possible_paths}")
+        flash(f"File not found: {filename}. The artifact may not have been generated for this experiment.", "error")
         return redirect(url_for("main.dashboard"))
 
     return send_file(path, as_attachment=True)

@@ -191,10 +191,14 @@
                 {% if problem_type == 'classification' %}
                 <div class="perf-bar-fill" data-width="{{ r_score }}"></div>
                 {% else %}
-                <div class="perf-bar-fill" data-width="{{ (1 - (r_score / best_score)) * 100 if best_score > 0 else 0 }}"></div>
+                {% set all_scores = results_list|map(attribute='primary_score')|list %}
+                {% set min_score = all_scores|min if all_scores else 0 %}
+                {% set max_score = all_scores|max if all_scores else 1 %}
+                {% set range_score = max_score - min_score if max_score != min_score else 1 %}
+                <div class="perf-bar-fill" data-width="{{ ((max_score - r_score) / range_score * 100) }}"></div>
                 {% endif %}
               </div>
-              <span class="perf-bar-label">{{ "%.1f"|format(r_score) }}{% if problem_type == 'classification' %}%{% endif %}</span>
+              <span class="perf-bar-label">{{ "%.1f"|format(r_score) }}</span>
             </div>
           </td>
           <td>
@@ -204,7 +208,7 @@
           </td>
           <td>
             {% if r_model in model_paths %}
-            <a href="{{ url_for('main.download_artifact', artifact_type='model', filename=model_paths[r_model]|replace('\\', '/')|replace(current_app.config['ARTIFACT_FOLDER'] + '/', '') ) }}">
+            <a href="{{ url_for('main.download_artifact', artifact_type='model', filename=model_paths[r_model]|replace('\\', '/')|replace(artifact_folder + '/', '') ) }}">
               <button class="btn-success btn-sm">⬇ .pkl</button>
             </a>
             {% else %}—{% endif %}
@@ -230,7 +234,7 @@
         <div class="artifact-icon">⚖️</div>
         <div class="artifact-name">Feature Scaler</div>
         <div class="artifact-desc">StandardScaler fitted on training data</div>
-        <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=preproc_paths.get('scaler', '')|replace('\\', '/')|replace(current_app.config['ARTIFACT_FOLDER'] + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
+        <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=preproc_paths.get('scaler', '')|replace('\\', '/')|replace(artifact_folder + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
       </div>
       {% endif %}
       {% if preproc_paths.get('pca') %}
@@ -238,7 +242,7 @@
         <div class="artifact-icon">📉</div>
         <div class="artifact-name">PCA Transformer</div>
         <div class="artifact-desc">Dimensionality reduction matrix</div>
-        <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=preproc_paths.get('pca', '')|replace('\\', '/')|replace(current_app.config['ARTIFACT_FOLDER'] + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
+        <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=preproc_paths.get('pca', '')|replace('\\', '/')|replace(artifact_folder + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
       </div>
       {% endif %}
       {% if preproc_paths.get('vectorizer') %}
@@ -246,7 +250,7 @@
         <div class="artifact-icon">📝</div>
         <div class="artifact-name">TF-IDF Vectorizer</div>
         <div class="artifact-desc">NLP text preprocessing pipeline</div>
-        <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=preproc_paths.get('vectorizer', '')|replace('\\', '/')|replace(current_app.config['ARTIFACT_FOLDER'] + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
+        <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=preproc_paths.get('vectorizer', '')|replace('\\', '/')|replace(artifact_folder + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
       </div>
       {% endif %}
       {% if preproc_paths.get('target_encoder') %}
@@ -254,7 +258,7 @@
         <div class="artifact-icon">🎯</div>
         <div class="artifact-name">Target Encoder</div>
         <div class="artifact-desc">Label encoder for target column</div>
-        <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=preproc_paths.get('target_encoder', '')|replace('\\', '/')|replace(current_app.config['ARTIFACT_FOLDER'] + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
+        <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=preproc_paths.get('target_encoder', '')|replace('\\', '/')|replace(artifact_folder + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
       </div>
       {% endif %}
       {% for key, path in preproc_paths.items() %}
@@ -263,7 +267,7 @@
           <div class="artifact-icon">🔤</div>
           <div class="artifact-name">Label Encoder: {{ key[3:] }}</div>
           <div class="artifact-desc">Categorical column encoder</div>
-          <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=path|replace('\\', '/')|replace(current_app.config['ARTIFACT_FOLDER'] + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
+          <a href="{{ url_for('main.download_artifact', artifact_type='preproc', filename=path|replace('\\', '/')|replace(artifact_folder + '/', '') ) }}" class="btn btn-secondary btn-sm">Download .pkl</a>
         </div>
         {% endif %}
       {% endfor %}
