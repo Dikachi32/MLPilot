@@ -6,4 +6,5 @@ __pycache__/
 instance/
 mlpilot.db
 uploads/
-models/
+models/venv
+artifacts/
