@@ -113,12 +113,11 @@ def builder():
             sample_vals = df[col].dropna().astype(str).head(3).tolist()
             column_samples[col] = ", ".join(sample_vals) if sample_vals else "—"
 
-        # Store in session for builder flow
+        # Only the filename needs to survive the redirect — the cookie is 4KB.
+        # analysis/column_types/column_uniques/column_samples are passed straight
+        # into the template below and re-derived in train(), so keeping them in
+        # the session only inflates the cookie until Flask silently drops it.
         flask_session["current_dataset"] = unique_name
-        flask_session["current_analysis"] = analysis
-        flask_session["current_column_types"] = column_types
-        flask_session["current_column_uniques"] = column_uniques
-        flask_session["current_column_samples"] = column_samples
 
         # Available models for manual picker
         classification_models = list(CLASSIFICATION_MODELS.keys())
@@ -301,9 +300,10 @@ def train():
     HistoryService.set_features_used(exp, json.dumps(result.get("preprocessing", {}).get("feature_names", [])))
     HistoryService.finalize_experiment(exp, status="completed")
 
-    # Store result in session for display
-    flask_session["last_result"] = result_native
+    # Result is persisted in exp.result_json; the session cookie is 4KB and
+    # cannot hold a full result payload without being silently dropped.
     flask_session["last_experiment_id"] = exp.id
+    flask_session.pop("last_result", None)
 
     return redirect(url_for("main.results", experiment_id=exp.id))
 
@@ -316,12 +316,7 @@ def results(experiment_id):
         flash("Experiment not found.", "error")
         return redirect(url_for("main.dashboard"))
 
-    result = flask_session.get("last_result")
-    session_exp_id = flask_session.get("last_experiment_id")
-
-    # If session result doesn't match this experiment, reconstruct from DB
-    if not result or session_exp_id != experiment_id:
-        result = reconstruct_result_from_experiment(exp)
+    result = reconstruct_result_from_experiment(exp)
 
     artifact_folder = current_app.config.get("ARTIFACT_FOLDER", "artifacts")
     return render_template("results.html", experiment=exp, result=result, artifact_folder=artifact_folder)

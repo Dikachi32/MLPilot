@@ -12,6 +12,10 @@ class Experiment(db.Model):
     dataset_name = db.Column(db.String(500), nullable=False)
     dataset_size_rows = db.Column(db.Integer, nullable=True)
     dataset_size_cols = db.Column(db.Integer, nullable=True)
+    dataset_shape = db.Column(db.String(50), nullable=True)  # JSON "[rows, cols]"
+
+    # Run configuration
+    run_mode = db.Column(db.String(20), nullable=True)  # auto | manual
 
     # Detection
     detected_problem = db.Column(db.String(100), nullable=True)
@@ -27,6 +31,9 @@ class Experiment(db.Model):
     best_model_name = db.Column(db.String(200), nullable=True)
     best_metric_name = db.Column(db.String(50), nullable=True)
     best_metric_value = db.Column(db.Float, nullable=True)
+
+    # Full result payload, so /results can be rebuilt without the session cookie
+    result_json = db.Column(db.Text, nullable=True)  # JSON
 
     # Optimization
     optimized = db.Column(db.Boolean, default=False)
@@ -71,6 +78,18 @@ class Experiment(db.Model):
 
     def get_artifact_paths(self) -> dict:
         return json.loads(self.artifact_paths or "{}")
+
+    def set_result(self, result: dict):
+        self.result_json = json.dumps(result, default=str)
+
+    def get_result(self) -> dict:
+        return json.loads(self.result_json or "{}")
+
+    def get_dataset_shape(self) -> list:
+        try:
+            return json.loads(self.dataset_shape or "[]")
+        except (TypeError, ValueError):
+            return []
 
     def __repr__(self):
         return f"<Experiment {self.experiment_name} ({self.status})>"

@@ -8,9 +8,23 @@
 {% set metadata = result.get('metadata', {}) or {} %}
 {% set problem_type = result.get('problem_type', 'unknown') %}
 {% set results_list = result.get('results', []) or [] %}
+{% set failed_models = result.get('failed_models', []) or [] %}
 {% set model_paths = result.get('model_paths', {}) or {} %}
 {% set preproc_paths = result.get('preproc_paths', {}) or {} %}
 {% set smote_applied = result.get('smote_applied', False) %}
+{% set lower_is_better = problem_type not in ['classification', 'nlp', 'image_classification'] %}
+
+{# Collect every usable score ONCE, outside the row loop. Any row without a
+   primary_score is skipped rather than passed to |min / |max as Undefined. #}
+{% set score_values = [] %}
+{% for r in results_list %}
+  {% if r.get('primary_score') is not none %}
+    {% set _ = score_values.append(r.get('primary_score')) %}
+  {% endif %}
+{% endfor %}
+{% set min_score = score_values|min if score_values else 0 %}
+{% set max_score = score_values|max if score_values else 1 %}
+{% set range_score = (max_score - min_score) if (max_score != min_score) else 1 %}
 
 <!-- Header -->
 <div class="fade-up results-header">
@@ -22,7 +36,7 @@
     </p>
   </div>
   <span class="problem-chip problem-{{ problem_type }}">
-    {{ problem_type|title }}
+    {{ problem_type|replace('_', ' ')|title }}
   </span>
 </div>
 
@@ -35,8 +49,8 @@
   <div class="stat-card">
     <div class="stat-label">Best Score</div>
     <div class="stat-value" style="color:var(--success-dark);">
-      {% if recommendation.get('score') %}
-        {{ "%.2f"|format(recommendation.get('score', 0)) }}{% if recommendation.get('metric') and 'accuracy' in recommendation.get('metric', '').lower() %}%{% endif %}
+      {% if recommendation.get('score') is not none %}
+        {{ "%.2f"|format(recommendation.get('score', 0)) }}{% if 'accuracy' in (recommendation.get('metric') or '')|lower %}%{% endif %}
       {% else %}—{% endif %}
     </div>
     <div class="stat-sub">{{ recommendation.get('metric', '') }}</div>
@@ -47,7 +61,8 @@
   </div>
   <div class="stat-card">
     <div class="stat-label">Dataset Shape</div>
-    <div class="stat-value" style="font-size:1.1rem;">{{ metadata.get('dataset_shape', ['—','—'])[0] }}×{{ metadata.get('dataset_shape', ['—','—'])[1] }}</div>
+    {% set shape = metadata.get('dataset_shape') or ['—', '—'] %}
+    <div class="stat-value" style="font-size:1.1rem;">{{ shape[0] }}×{{ shape[1] }}</div>
   </div>
 </div>
 
@@ -57,7 +72,7 @@
   <h3>🤖 Auto Mode — System Selections</h3>
   <ul>
     <li><strong>Target Column:</strong> {{ experiment.target_column or 'Auto-detected' }}</li>
-    <li><strong>Problem Type:</strong> {{ problem_type }}</li>
+    <li><strong>Problem Type:</strong> {{ problem_type|replace('_', ' ') }}</li>
     <li><strong>SMOTE Applied:</strong> {{ 'Yes' if smote_applied else 'No' }}</li>
     <li><strong>PCA Applied:</strong> {{ 'Yes' if recommendation.get('pca_applied') else 'No' }}</li>
   </ul>
@@ -66,7 +81,7 @@
 
 {% if preprocessing.get('cleaning_log') %}
 <div class="info-panel panel-cleaning fade-up fade-up-1">
-  <h3>🧹 Data Cleaning & Preparation</h3>
+  <h3>🧹 Data Cleaning &amp; Preparation</h3>
   <ol>
     {% for log in preprocessing.get('cleaning_log', []) %}
     <li>{{ log }}</li>
@@ -94,9 +109,21 @@
   <h3>🚫 Columns Automatically Skipped</h3>
   <ul>
     {% for dc in preprocessing.get('dropped_columns', []) %}
-    <li><strong>{{ dc.column }}</strong> — {{ dc.reason }}</li>
+    <li><strong>{{ dc.get('column', '—') }}</strong> — {{ dc.get('reason', '') }}</li>
     {% endfor %}
   </ul>
+</div>
+{% endif %}
+
+{% if failed_models %}
+<div class="info-panel panel-warning fade-up fade-up-1">
+  <h3>⚠️ Models That Could Not Be Trained</h3>
+  <ul>
+    {% for fm in failed_models %}
+    <li><strong>{{ fm.get('model', '—') }}</strong> — {{ fm.get('error', 'Unknown error') }}</li>
+    {% endfor %}
+  </ul>
+  <p style="margin-top:0.5rem; font-size:13px;">These were excluded from the leaderboard. The remaining models trained normally.</p>
 </div>
 {% endif %}
 
@@ -107,18 +134,24 @@
   <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:1rem; margin-top:0.75rem;">
     <div>
       <div class="stat-label">Primary Metric</div>
-      <div class="stat-value" style="font-size:1.4rem;">{{ recommendation.get('metric', '—') }} = {{ "%.2f"|format(recommendation.get('score', 0)) }}{% if recommendation.get('metric') and 'accuracy' in recommendation.get('metric', '').lower() %}%{% endif %}</div>
+      <div class="stat-value" style="font-size:1.4rem;">
+        {{ recommendation.get('metric', '—') }} =
+        {% if recommendation.get('score') is not none %}{{ "%.2f"|format(recommendation.get('score', 0)) }}{% if 'accuracy' in (recommendation.get('metric') or '')|lower %}%{% endif %}{% else %}—{% endif %}
+      </div>
     </div>
-    {% if recommendation.get('baseline_score') %}
+    {% if recommendation.get('baseline_score') is not none and recommendation.get('optimized_score') is not none %}
     <div>
       <div class="stat-label">Baseline → Optimized</div>
       <div class="stat-value" style="font-size:1.2rem;">{{ "%.2f"|format(recommendation.get('baseline_score', 0)) }} → {{ "%.2f"|format(recommendation.get('optimized_score', 0)) }}</div>
-      <div class="stat-sub" style="color:var(--success-dark);">+{{ "%.1f"|format(recommendation.get('improvement_pct', 0)) }}% improvement</div>
+      {% set imp = recommendation.get('improvement_pct', 0) or 0 %}
+      <div class="stat-sub" style="color:{% if imp >= 0 %}var(--success-dark){% else %}var(--text-muted){% endif %};">
+        {{ '+' if imp >= 0 else '' }}{{ "%.1f"|format(imp) }}% vs baseline
+      </div>
     </div>
     {% endif %}
     <div>
       <div class="stat-label">Generalization</div>
-      <div class="stat-value" style="font-size:1.1rem;">{{ recommendation.get('overfitting_status', 'N/A') }}</div>
+      <div class="stat-value" style="font-size:1.1rem;">{{ (recommendation.get('overfitting_status') or 'N/A')|replace('_', ' ')|title }}</div>
     </div>
   </div>
 </div>
@@ -129,6 +162,10 @@
 <div class="card fade-up fade-up-3" style="padding:0; overflow:hidden;">
   <div style="padding:1.25rem 1.5rem; border-bottom:1px solid var(--border);">
     <h3>📊 Model Leaderboard</h3>
+    <p style="color:var(--text-muted); font-size:13px; margin-top:2px;">
+      Ranked by {{ recommendation.get('metric', 'primary metric') }}
+      ({{ 'lower is better' if lower_is_better else 'higher is better' }}).
+    </p>
   </div>
   <div class="table-wrapper">
     <table class="leaderboard-table">
@@ -137,7 +174,7 @@
           <th style="width:50px;">Rank</th>
           <th>Model</th>
           <th>Problem</th>
-          {% if problem_type == 'classification' %}
+          {% if not lower_is_better %}
           <th>Accuracy</th>
           <th>Precision</th>
           <th>Recall</th>
@@ -154,11 +191,10 @@
         </tr>
       </thead>
       <tbody>
-        {% set best_score = results_list[0].get('primary_score', 0) if results_list else 0 %}
         {% for r in results_list %}
         {% set r_model = r.get('model', '') %}
         {% set r_problem = r.get('problem_type', problem_type) %}
-        {% set r_score = r.get('primary_score', 0) %}
+        {% set r_score = r.get('primary_score') %}
         {% set r_test_metrics = r.get('test_metrics', {}) or {} %}
         {% set r_diagnostics = r.get('diagnostics', {}) or {} %}
         {% set r_optimized = r.get('optimized', False) %}
@@ -172,38 +208,43 @@
           <td>
             <span class="model-name">{{ r_model }}</span>
             {% if r_optimized %}<span class="optimized-badge">OPTIMIZED</span>{% endif %}
+            {% if r_optimized and r.get('improvement_pct') is not none %}
+              {% set imp = r.get('improvement_pct') %}
+              <div class="stat-sub" style="color:{% if imp >= 0 %}var(--success-dark){% else %}var(--text-muted){% endif %}; font-size:12px;">
+                {{ '+' if imp >= 0 else '' }}{{ "%.1f"|format(imp) }}% vs baseline
+              </div>
+            {% endif %}
           </td>
-          <td><span class="dtype-badge dtype-{{ r_problem }}">{{ r_problem }}</span></td>
-          {% if problem_type == 'classification' %}
-          <td class="metric-cell">{{ "%.2f"|format(r_test_metrics.get('accuracy', 0)) if r_test_metrics.get('accuracy') else '—' }}%</td>
-          <td class="metric-cell">{{ "%.2f"|format(r_test_metrics.get('precision', 0)) if r_test_metrics.get('precision') else '—' }}%</td>
-          <td class="metric-cell">{{ "%.2f"|format(r_test_metrics.get('recall', 0)) if r_test_metrics.get('recall') else '—' }}%</td>
-          <td class="metric-cell">{{ "%.2f"|format(r_test_metrics.get('f1', 0)) if r_test_metrics.get('f1') else '—' }}%</td>
+          <td><span class="dtype-badge dtype-{{ r_problem }}">{{ r_problem|replace('_', ' ') }}</span></td>
+          {% if not lower_is_better %}
+          <td class="metric-cell">{% if r_test_metrics.get('accuracy') is not none %}{{ "%.2f"|format(r_test_metrics.get('accuracy')) }}%{% else %}—{% endif %}</td>
+          <td class="metric-cell">{% if r_test_metrics.get('precision') is not none %}{{ "%.2f"|format(r_test_metrics.get('precision')) }}%{% else %}—{% endif %}</td>
+          <td class="metric-cell">{% if r_test_metrics.get('recall') is not none %}{{ "%.2f"|format(r_test_metrics.get('recall')) }}%{% else %}—{% endif %}</td>
+          <td class="metric-cell">{% if r_test_metrics.get('f1') is not none %}{{ "%.2f"|format(r_test_metrics.get('f1')) }}%{% else %}—{% endif %}</td>
           {% else %}
-          <td class="metric-cell">{{ "%.4f"|format(r_test_metrics.get('mse', 0)) if r_test_metrics.get('mse') else '—' }}</td>
-          <td class="metric-cell">{{ "%.4f"|format(r_test_metrics.get('mae', 0)) if r_test_metrics.get('mae') else '—' }}</td>
-          <td class="metric-cell">{{ "%.4f"|format(r_test_metrics.get('rmse', 0)) if r_test_metrics.get('rmse') else '—' }}</td>
-          <td class="metric-cell">{{ "%.4f"|format(r_test_metrics.get('r2', 0)) if r_test_metrics.get('r2') else '—' }}</td>
+          <td class="metric-cell">{% if r_test_metrics.get('mse') is not none %}{{ "%.4f"|format(r_test_metrics.get('mse')) }}{% else %}—{% endif %}</td>
+          <td class="metric-cell">{% if r_test_metrics.get('mae') is not none %}{{ "%.4f"|format(r_test_metrics.get('mae')) }}{% else %}—{% endif %}</td>
+          <td class="metric-cell">{% if r_test_metrics.get('rmse') is not none %}{{ "%.4f"|format(r_test_metrics.get('rmse')) }}{% else %}—{% endif %}</td>
+          <td class="metric-cell">{% if r_test_metrics.get('r2') is not none %}{{ "%.4f"|format(r_test_metrics.get('r2')) }}{% else %}—{% endif %}</td>
           {% endif %}
           <td class="perf-bar-cell">
             <div class="perf-bar-wrap">
               <div class="perf-bar-bg">
-                {% if problem_type == 'classification' %}
-                <div class="perf-bar-fill" data-width="{{ r_score }}"></div>
+                {% if r_score is none %}
+                  {% set bar_width = 0 %}
+                {% elif not lower_is_better %}
+                  {% set bar_width = r_score %}
                 {% else %}
-                {% set all_scores = results_list|map(attribute='primary_score')|list %}
-                {% set min_score = all_scores|min if all_scores else 0 %}
-                {% set max_score = all_scores|max if all_scores else 1 %}
-                {% set range_score = max_score - min_score if max_score != min_score else 1 %}
-                <div class="perf-bar-fill" data-width="{{ ((max_score - r_score) / range_score * 100) }}"></div>
+                  {% set bar_width = ((max_score - r_score) / range_score * 100) %}
                 {% endif %}
+                <div class="perf-bar-fill" data-width="{{ "%.1f"|format(bar_width) }}"></div>
               </div>
-              <span class="perf-bar-label">{{ "%.1f"|format(r_score) }}</span>
+              <span class="perf-bar-label">{% if r_score is not none %}{{ "%.1f"|format(r_score) }}{% else %}—{% endif %}</span>
             </div>
           </td>
           <td>
-            {% if r_diagnostics %}
-            <span class="status-pill status-{{ r_diagnostics.get('status', 'unknown') }}">{{ r_diagnostics.get('status', 'unknown')|replace('_', ' ')|title }}</span>
+            {% if r_diagnostics.get('status') %}
+            <span class="status-pill status-{{ r_diagnostics.get('status') }}">{{ r_diagnostics.get('status')|replace('_', ' ')|title }}</span>
             {% else %}—{% endif %}
           </td>
           <td>
@@ -217,6 +258,38 @@
         {% endfor %}
       </tbody>
     </table>
+  </div>
+</div>
+{% elif result.get('status') == 'failed' %}
+<div class="info-panel panel-warning fade-up fade-up-3">
+  <h3>❌ This Experiment Did Not Complete</h3>
+  <p>{{ result.get('error') or experiment.error_message or 'No models were trained.' }}</p>
+</div>
+{% endif %}
+
+<!-- Unsupervised summary (no leaderboard for clustering runs) -->
+{% if problem_type == 'unsupervised' and result.get('clustering') %}
+<div class="card fade-up fade-up-3">
+  <div class="card-header">
+    <div class="card-header-icon">🧭</div>
+    <div><h3>Clustering Summary</h3><p>Unsupervised structure discovered in your dataset</p></div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Best k (K-Means)</div>
+      <div class="stat-value">{{ result.get('clustering', {}).get('best_k', '—') }}</div>
+      <div class="stat-sub">Silhouette {{ result.get('clustering', {}).get('best_silhouette', '—') }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Hierarchical Clusters</div>
+      <div class="stat-value">{{ result.get('hierarchical', {}).get('n_clusters', '—') }}</div>
+      <div class="stat-sub">Silhouette {{ result.get('hierarchical', {}).get('silhouette', '—') }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">PCA Components</div>
+      <div class="stat-value">{{ result.get('pca', {}).get('n_components', '—') }}</div>
+      <div class="stat-sub">{{ result.get('pca', {}).get('total_variance', '—') }}% variance</div>
+    </div>
   </div>
 </div>
 {% endif %}
@@ -271,6 +344,8 @@
         </div>
         {% endif %}
       {% endfor %}
+    {% else %}
+      <p style="color:var(--text-muted); font-size:14px;">No preprocessing artifacts were produced for this run.</p>
     {% endif %}
   </div>
 
@@ -291,10 +366,10 @@
 <div class="next-steps fade-up fade-up-4">
   <h3>💡 What Next?</h3>
   <ul>
-    <li><strong>Best Model:</strong> {{ recommendation.get('model', '—') }} achieved the highest performance. Use its .pkl file for inference.</li>
-    <li><strong>Ensemble Advantage:</strong> The Voting Ensemble combines multiple models for more robust predictions when individual models disagree.</li>
+    <li><strong>Best Model:</strong> {{ recommendation.get('model', '—') }} achieved the strongest {{ recommendation.get('metric', 'score') }}. Use its .pkl file for inference.</li>
+    <li><strong>Ensemble Advantage:</strong> The Voting Ensemble combines the best variant of each algorithm for more robust predictions when individual models disagree.</li>
     <li><strong>Download Everything:</strong> Grab the <strong>Production Package</strong> for a complete, deployment-ready bundle with all artifacts and metadata.</li>
-    <li><strong>Iterate:</strong> Run a new experiment with different features or try hyperparameter optimization for even better results.</li>
+    <li><strong>Iterate:</strong> Run a new experiment with different features, or enable hyperparameter optimization for a tuned comparison.</li>
   </ul>
 </div>
 
